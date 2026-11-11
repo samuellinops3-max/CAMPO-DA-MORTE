@@ -113,6 +113,7 @@ static void present(void)
     cur ^= 1;
     first_flip = 0;
 }
+
 static void fill_rect(int x, int y, int w, int h, u32 c)
 {
     int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y;
@@ -170,8 +171,6 @@ static const char *find_glyph(char c)
         if (glyphs[i].c == c) return glyphs[i].p;
     return NULL;
 }
-
-static int text_width(const char *s, int sc) { return (int)strlen(s) * 4 * sc - sc; }
 
 static void draw_text(const char *s, int x, int y, int sc, u32 c)
 {
@@ -258,6 +257,7 @@ static void kill_snake(int i)
         dead_t = 0;
     }
 }
+
 static void bot_think(int i)
 {
     Snake *s = &sn[i];
@@ -554,7 +554,37 @@ static void render(void)
     sprintf(buf, "RECORDE: %d", best_score);
     draw_text(buf, 24, 20 + 16 * ui, ui - 1 > 2 ? ui - 1 : 2, 0x007CE38B);
 
-    int t0 = -1, t1 = -1, t2 = -1;
-    for (int i = 0; i < NSN; i++) {
-        if (!sn[i].alive) continue;
-        if (t0 < 0 || sn[i].score > sn[t0].score) { t2 = t1; t1 = t0; t0 = i; }
+    if (!sn[IDX0].alive) {
+        draw_text("GAME OVER", W / 2 - text_width("GAME OVER", ui + 2) / 2, H / 2 - 20, ui + 2, 0x00FF4D4D);
+        draw_text("APERTE X PARA RENASCER", W / 2 - text_width("APERTE X PARA RENASCER", ui - 1) / 2, H / 2 + 25, ui - 1, 0x00FFFFFF);
+    }
+
+    if (paused) {
+        draw_text("JOGO PAUSADO", W / 2 - text_width("JOGO PAUSADO", ui + 2) / 2, H / 2 - 10, ui + 2, 0x0038B6FF);
+    }
+
+    present();
+}
+
+int main(void)
+{
+    // Inicializações essenciais do sistema PS3
+    sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, sysutil_cb, NULL);
+    init_screen();
+    
+    // Inicializa o subsistema de controle do PSL1GHT (ESSENCIAL para não desconectar)
+    ioPadInit(7);
+
+    init_game();
+
+    while (running) {
+        sysUtilCheckCallback();
+        read_pad();
+        update_game();
+        render();
+    }
+
+    // Finaliza o controle e sai do jogo de forma limpa
+    ioPadEnd();
+    return 0;
+}
