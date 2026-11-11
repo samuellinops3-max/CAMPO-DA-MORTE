@@ -1,4 +1,4 @@
-// Cobra Arena v1.2 - Nativo para PS3 (PSL1GHT)
+// Cobra Arena v1.2 - Nativo para PS3 (PSL1GHT) com Mini-mapa e Skins de Bandeiras
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +28,7 @@ typedef struct {
     int len, alive, respawn, boost, grow, score, tick, avoid_t;
     float ang, tgt, avoid_dir;
     u32 col;
+    int skin_type; // 0: Normal, 1: EUA (Vermelho/Azul/Branco), 2: Brasil (Verde/Amarelo/Azul), 3: Arco-íris
 } Snake;
 
 typedef struct {
@@ -209,6 +210,25 @@ static float radius_of(const Snake *s)
     return 10.0f + l * 0.036f;
 }
 
+static u32 get_snake_color(const Snake *s, int j)
+{
+    if (s->skin_type == 1) {
+        // EUA: Alterna entre Vermelho, Branco e Azul
+        int mod = j % 3;
+        if (mod == 0) return 0.00FF4D4D; // Vermelho
+        if (mod == 1) return 0x00FFFFFF; // Branco
+        return 0.0038B6FF;              // Azul
+    } else if (s->skin_type == 2) {
+        // Brasil: Verde, Amarelo e Azul
+        int mod = j % 3;
+        if (mod == 0) return 0x00009933; // Verde
+        if (mod == 1) return 0x00FFCC00; // Amarelo
+        return 0.000066CC;              // Azul
+    }
+    // Padrão aleatório/original
+    return (j % 6 < 3) ? s->col : ((s->col >> 1) & 0x007F7F7F);
+}
+
 static void add_pellet(float x, float y, int size)
 {
     if (x < 35.0f) x = 35.0f;
@@ -243,6 +263,7 @@ static void spawn_snake(int i)
     s->alive = 1; s->respawn = 0; s->boost = 0;
     s->grow = 0; s->tick = 0; s->avoid_t = 0; s->avoid_dir = 1.0f;
     s->col = palette[i % PAL_SZ];
+    s->skin_type = rand() % 3; // Sorteia uma skin de bandeira ou padrão ao renascer!
 }
 
 static void kill_snake(int i)
@@ -338,8 +359,8 @@ static void update_snake(int i)
 
     float sp = 3.2f;
     if (s->boost && s->len > 12) {
-        sp = 5.8f;
-        if (s->tick % 12 == 0) {
+        sp = 6.2f; // Turbo mais veloz
+        if (s->tick % 10 == 0) {
             s->len--;
             add_pellet(s->x[s->len], s->y[s->len], 1);
         }
@@ -524,13 +545,12 @@ static void render(void)
         Snake *s = &sn[i];
         if (!s->alive) continue;
         int r = (int)(radius_of(s) * sc);
-        u32 dark = (s->col >> 1) & 0x007F7F7F;
 
         for (int j = s->len - 1; j >= 0; j--) {
             int px = (int)((s->x[j] - camx) * sc + hw);
             int py = (int)((s->y[j] - camy) * sc + hh);
             if (s->boost && j % 3 == 0) circle(px, py, r + 3, 0x00FFFFFF);
-            circle(px, py, r, (j % 6 < 3) ? s->col : dark);
+            circle(px, py, r, get_snake_color(s, j));
         }
 
         int hx = (int)((s->x[IDX0] - camx) * sc + hw);
@@ -543,6 +563,22 @@ static void render(void)
                    ey + (int)(sinf(s->ang) * r * 0.16f),
                    r * 19 / 100 + 1, 0x00000000);
         }
+    }
+
+    // --- DESENHO DO MINI-MAPA (RADAR) NO CANTO SUPERIOR DIREITO ---
+    int mm_size = 130;
+    int mm_x = W - mm_size - 30;
+    int mm_y = 30;
+    fill_rect(mm_x - 3, mm_y - 3, mm_size + 6, mm_size + 6, 0x00FFFFFF); // Borda branca
+    fill_rect(mm_x, mm_y, mm_size, mm_size, 0x000B111E); // Fundo do radar
+
+    // Desenha cobras no mini-mapa
+    for (int i = 0; i < NSN; i++) {
+        if (!sn[i].alive) continue;
+        int mx = mm_x + (int)((sn[i].x[IDX0] / WORLD) * mm_size);
+        int my = mm_y + (int)((sn[i].y[IDX0] / WORLD) * mm_size);
+        u32 mcol = (i == 0) ? 0x0000FF00 : 0x00FF4D4D; // Jogador verde, bots vermelhos
+        fill_rect(mx - 1, my - 1, 3, 3, mcol);
     }
 
     char buf[BUF_SZ];
@@ -573,7 +609,7 @@ int main(void)
     sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, sysutil_cb, NULL);
     init_screen();
     
-    // Inicialização obrigatória do controle para evitar desconexão
+    // Inicialização obrigatória do controle do PS3
     ioPadInit(7);
 
     init_game();
@@ -585,6 +621,4 @@ int main(void)
         render();
     }
 
-    ioPadEnd();
-    return 0;
-}
+    ioPadE
