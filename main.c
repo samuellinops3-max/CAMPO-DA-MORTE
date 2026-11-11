@@ -1,4 +1,4 @@
-// Cobra Arena v1.2 - Nativo para PS3 (PSL1GHT) com Áudio, Mini-mapa e Skins
+// Cobra Arena v1.2 - Nativo para PS3 (PSL1GHT) com Mini-mapa e Skins
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +10,6 @@
 #include <sysutil/video.h>
 #include <rsx/rsx.h>
 #include <io/pad.h>
-#include <cell/audio.h>
 
 #define CB_SIZE   (0x100000)
 #define HOST_SIZE (32 * 1024 * 1024)
@@ -50,39 +49,11 @@ static u32 off0, off1;
 static u32 *back;
 static int cur = 0, first_flip = 1;
 static volatile int running = 1;
-static uint32_t audio_port = 0;
 
 static void sysutil_cb(u64 status, u64 param, void *usrdata)
 {
     (void)param; (void)usrdata;
     if (status == SYSUTIL_EXIT_GAME) running = 0;
-}
-
-static void init_audio(void)
-{
-    cellAudioInit();
-    CellAudioPortParam param;
-    param.nChannel = 2;
-    param.block = CELL_AUDIO_BLOCK_8_SAMPLES;
-    cellAudioPortOpen(&param, &audio_port);
-    cellAudioStart();
-}
-
-static void play_sound_effect(int type)
-{
-    if (audio_port == 0) return;
-    float buffer[256];
-    int freq = (type == 1) ? 880 : 220; // 1: Bipe agudo (Comer), 2: Tom grave (Morte)
-    int duration = (type == 1) ? 12 : 35;
-
-    for (int i = 0; i < duration; i++) {
-        for (int j = 0; j < 32; j++) {
-            float sample = sinf(2.0f * PI * freq * (i * 32 + j) / 44100.0f) * 0.25f;
-            buffer[j * 2] = sample;     // Canal Esquerdo
-            buffer[j * 2 + 1] = sample; // Canal Direito
-        }
-        cellAudioPortAddBlock(audio_port, buffer, 32);
-    }
 }
 
 static void init_screen(void)
@@ -304,7 +275,6 @@ static void kill_snake(int i)
     if (i == 0) {
         if (s->score > best_score) best_score = s->score;
         dead_t = 0;
-        play_sound_effect(2); // Som de morte
     }
 }
 
@@ -421,10 +391,7 @@ static void update_snake(int i)
             pel[k].active = 0;
             s->grow += pel[k].size;
             s->score += pel[k].size * 10;
-            if (i == 0) {
-                if (s->score > best_score) best_score = s->score;
-                play_sound_effect(1); // Som de comer
-            }
+            if (i == 0 && s->score > best_score) best_score = s->score;
         }
     }
 
@@ -587,40 +554,4 @@ static void render(void)
         int hy = (int)((s->y[IDX0] - camy) * sc + hh);
         for (int e = -1; e <= 1; e += 2) {
             int ex = hx + (int)(cosf(s->ang + e * 0.65f) * r * 0.58f);
-            int ey = hy + (int)(sinf(s->ang + e * 0.65f) * r * 0.58f);
-            circle(ex, ey, r * 36 / 100 + 2, 0x00FFFFFF);
-            circle(ex + (int)(cosf(s->ang) * r * 0.16f),
-                   ey + (int)(sinf(s->ang) * r * 0.16f),
-                   r * 19 / 100 + 1, 0x00000000);
-        }
-    }
-
-    // Mini-mapa (radar)
-    int mm_size = 130;
-    int mm_x = W - mm_size - 30;
-    int mm_y = 30;
-    fill_rect(mm_x - 3, mm_y - 3, mm_size + 6, mm_size + 6, 0x00FFFFFF);
-    fill_rect(mm_x, mm_y, mm_size, mm_size, 0x000B111E);
-
-    for (int i = 0; i < NSN; i++) {
-        if (!sn[i].alive) continue;
-        int mx = mm_x + (int)((sn[i].x[IDX0] / WORLD) * mm_size);
-        int my = mm_y + (int)((sn[i].y[IDX0] / WORLD) * mm_size);
-        u32 mcol = (i == 0) ? 0x0000FF00 : 0x00FF4D4D;
-        fill_rect(mx - 1, my - 1, 3, 3, mcol);
-    }
-
-    char buf[BUF_SZ];
-    int ui = (int)(4.0f * ((float)W / 1280.0f) + 0.5f);
-    if (ui < 3) ui = 3;
-
-    draw_text("PONTOS", 24, 20, ui, 0x00A8C5E5);
-    sprintf(buf, "%d", sn[IDX0].score);
-    draw_text(buf, 24, 20 + 7 * ui, ui + 2, 0x00FFD23F);
-
-    sprintf(buf, "RECORDE: %d", best_score);
-    draw_text(buf, 24, 20 + 16 * ui, ui - 1 > 2 ? ui - 1 : 2, 0x007CE38B);
-
-    if (!sn[IDX0].alive) {
-        draw_text("GAME OVER", W / 2 - text_width("GAME OVER", ui + 2) / 2, H / 2 - 20, ui + 2, 0x00FF4D4D);
-        draw_text("APERTE X PARA RENASCER", W / 2 -
+            int ey = hy + (int)(sinf(s->ang + e * 0.
