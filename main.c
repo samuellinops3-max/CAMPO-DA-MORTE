@@ -172,6 +172,8 @@ static const char *find_glyph(char c)
     return NULL;
 }
 
+static int text_width(const char *s, int sc) { return (int)strlen(s) * 4 * sc - sc; }
+
 static void draw_text(const char *s, int x, int y, int sc, u32 c)
 {
     for (; *s; s++) {
@@ -568,11 +570,10 @@ static void render(void)
 
 int main(void)
 {
-    // Inicializações essenciais do sistema PS3
     sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, sysutil_cb, NULL);
     init_screen();
     
-    // Inicializa o subsistema de controle do PSL1GHT (ESSENCIAL para não desconectar)
+    // Inicialização obrigatória do controle para evitar desconexão
     ioPadInit(7);
 
     init_game();
@@ -584,7 +585,6 @@ int main(void)
         render();
     }
 
-    // Finaliza o controle e sai do jogo de forma limpa
     ioPadEnd();
     return 0;
 }
