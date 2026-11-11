@@ -1,38 +1,37 @@
-ifeq ($(strip $(PSL1GHT)),)
-$(error "Defina a variavel PSL1GHT")
+ifeq ($(PS3DEV),)
+$(error PS3DEV environment variable is not set)
 endif
-include $(PSL1GHT)/ppu_rules
 
-.DEFAULT_GOAL := all
+include $(PS3DEV)/ppu/include/Makefile.pkg
 
-TARGET    := cobra
-TITLE     := Cobra Arena
-APPID     := COBR00001
-CONTENTID := UP0001-$(APPID)_00-0000000000000000
-SFOXML    := sfo.xml
-PORTLIBS  := $(PS3DEV)/portlibs/ppu
+TARGET		:= cobra.elf
+BUILD		:= build
+SFO_XML		:= sfo.xml
+TITLE_ID	:= COBR00001
 
-MACHDEP := -mhard-float -fmodulo-sched -ffunction-sections -fdata-sections
-CFLAGS  := -O2 -Wall -mcpu=cell $(MACHDEP) -I$(PSL1GHT)/ppu/include -I$(PORTLIBS)/include
-LDFLAGS := $(MACHDEP) -L$(PSL1GHT)/ppu/lib -L$(PORTLIBS)/lib
-LIBS    := -lrsx -lgcm_sys -lio -lsysutil -lrt -llv2 -lm
+OBJS		:= main.o
+
+CFLAGS		:= -O3 -Wall -Wextra -ffunction-sections -fdata-sections
+CXXFLAGS	:= $(CFLAGS)
+ASFLAGS		:= 
+LDFLAGS		:= -Wl,--gc-sections
+LIBS		:= -lrsx -lgcm_sys -lio -lsysutil -lrt -lm
 
 all: $(TARGET).pkg
 
-main.o: main.c
-	$(CC) $(CFLAGS) -c $< -o $@
+$(TARGET).pkg: $(TARGET).self $(SFO_XML)
+	pkg --contentid UP0001-$(TITLE_ID)_00-0000000000000000 $(SFO_XML) $(TARGET).self $@
 
-$(TARGET).elf: main.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LIBS)
+$(TARGET).self: $(TARGET)
+	ppu-lv2-objcopy -O binary $< $@.bin
+	# Sixtype / Self utility will generate the self
+	scetool -v --sce-type=SELF --compress-data=TRUE --encrypt $(TARGET).bin $@
 
-$(TARGET).pkg: $(TARGET).elf ICON0.PNG $(SFOXML)
-	rm -rf pkg
-	mkdir -p pkg/USRDIR
-	cp ICON0.PNG pkg/ICON0.PNG
-	$(PS3DEV)/bin/sprxlinker $(TARGET).elf
-	$(PS3DEV)/bin/make_self_npdrm $(TARGET).elf pkg/USRDIR/EBOOT.BIN $(CONTENTID)
-	$(PS3DEV)/bin/sfo.py --title "$(TITLE)" --appid "$(APPID)" -f $(SFOXML) pkg/PARAM.SFO
-	$(PS3DEV)/bin/pkg.py --contentid $(CONTENTID) pkg/ $@
+$(TARGET): $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -rf pkg *.o *.elf *.self *.pkg
+	rm -f $(TARGET) $(TARGET).self $(TARGET).bin $(TARGET).pkg $(OBJS)
