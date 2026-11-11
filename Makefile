@@ -13,9 +13,9 @@ CC		:= ppu-gcc
 CXX		:= ppu-g++
 LD		:= ppu-gcc
 
-CFLAGS		:= -O3 -Wall -Wextra -ffunction-sections -fdata-sections
+CFLAGS		:= -O3 -Wall -Wextra -ffunction-sections -fdata-sections -I$(PS3DEV)/ppu/include
 CXXFLAGS	:= $(CFLAGS)
-LDFLAGS		:= -Wl,--gc-sections
+LDFLAGS		:= -Wl,--gc-sections -L$(PS3DEV)/ppu/lib
 LIBS		:= -lrsx -lgcm_sys -lio -lsysutil -lrt -lvdec -lnet -lhttp -lssl -lcrypto -laudio -lm
 
 all: $(TARGET).pkg
