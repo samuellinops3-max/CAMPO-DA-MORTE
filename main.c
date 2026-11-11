@@ -1,4 +1,4 @@
-// Cobra Arena v1.2 - Nativo para PS3 (PSL1GHT) com Mini-mapa e Skins de Bandeiras
+// Cobra Arena v1.2 - Nativo para PS3 (PSL1GHT) com Áudio, Mini-mapa e Skins
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +10,7 @@
 #include <sysutil/video.h>
 #include <rsx/rsx.h>
 #include <io/pad.h>
+#include <cell/audio.h>
 
 #define CB_SIZE   (0x100000)
 #define HOST_SIZE (32 * 1024 * 1024)
@@ -49,11 +50,39 @@ static u32 off0, off1;
 static u32 *back;
 static int cur = 0, first_flip = 1;
 static volatile int running = 1;
+static uint32_t audio_port = 0;
 
 static void sysutil_cb(u64 status, u64 param, void *usrdata)
 {
     (void)param; (void)usrdata;
     if (status == SYSUTIL_EXIT_GAME) running = 0;
+}
+
+static void init_audio(void)
+{
+    cellAudioInit();
+    CellAudioPortParam param;
+    param.nChannel = 2;
+    param.block = CELL_AUDIO_BLOCK_8_SAMPLES;
+    cellAudioPortOpen(&param, &audio_port);
+    cellAudioStart();
+}
+
+static void play_sound_effect(int type)
+{
+    if (audio_port == 0) return;
+    float buffer[256];
+    int freq = (type == 1) ? 880 : 220; // 1: Bipe agudo (Comer), 2: Tom grave (Morte)
+    int duration = (type == 1) ? 12 : 35;
+
+    for (int i = 0; i < duration; i++) {
+        for (int j = 0; j < 32; j++) {
+            float sample = sinf(2.0f * PI * freq * (i * 32 + j) / 44100.0f) * 0.25f;
+            buffer[j * 2] = sample;     // Canal Esquerdo
+            buffer[j * 2 + 1] = sample; // Canal Direito
+        }
+        cellAudioPortAddBlock(audio_port, buffer, 32);
+    }
 }
 
 static void init_screen(void)
@@ -275,6 +304,7 @@ static void kill_snake(int i)
     if (i == 0) {
         if (s->score > best_score) best_score = s->score;
         dead_t = 0;
+        play_sound_effect(2); // Som de morte
     }
 }
 
@@ -391,7 +421,10 @@ static void update_snake(int i)
             pel[k].active = 0;
             s->grow += pel[k].size;
             s->score += pel[k].size * 10;
-            if (i == 0 && s->score > best_score) best_score = s->score;
+            if (i == 0) {
+                if (s->score > best_score) best_score = s->score;
+                play_sound_effect(1); // Som de comer
+            }
         }
     }
 
@@ -590,32 +623,4 @@ static void render(void)
 
     if (!sn[IDX0].alive) {
         draw_text("GAME OVER", W / 2 - text_width("GAME OVER", ui + 2) / 2, H / 2 - 20, ui + 2, 0x00FF4D4D);
-        draw_text("APERTE X PARA RENASCER", W / 2 - text_width("APERTE X PARA RENASCER", ui - 1) / 2, H / 2 + 25, ui - 1, 0x00FFFFFF);
-    }
-
-    if (paused) {
-        draw_text("JOGO PAUSADO", W / 2 - text_width("JOGO PAUSADO", ui + 2) / 2, H / 2 - 10, ui + 2, 0x0038B6FF);
-    }
-
-    present();
-}
-
-int main(void)
-{
-    sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, sysutil_cb, NULL);
-    init_screen();
-    
-    ioPadInit(7);
-
-    init_game();
-
-    while (running) {
-        sysUtilCheckCallback();
-        read_pad();
-        update_game();
-        render();
-    }
-
-    ioPadEnd();
-    return 0;
-}
+        draw_text("APERTE X PARA RENASCER", W / 2 -
