@@ -11,8 +11,9 @@ jobs:
     steps:
       - name: Dependencias
         run: |
+          export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y curl make git python2 python3 libgmp10 libelf1 zlib1g libssl1.1 bzip2 xz-utils
+          apt-get install -y curl make git python2 python3 libgmp10 libelf1 zlib1g libssl-dev bzip2 xz-utils
           ln -sf /usr/bin/python2 /usr/bin/python
 
       - uses: actions/checkout@v4
@@ -54,4 +55,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cobra-arena-pkg
-          path: cobra.pkg 
+          path: cobra.pkg
